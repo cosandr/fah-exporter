@@ -1,0 +1,12 @@
+[
+  {
+    "id": "01",
+    "status": "RUNNING",
+    "description": "gpu:0:GP102 [GeForce GTX 1080 Ti] 11380",
+    "options": {
+      "paused": false
+    },
+    "reason": "",
+    "idle": false
+  }
+]
