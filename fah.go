@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+const fahAPI = "https://stats.foldingathome.org/api"
+
 // readPyON Send command to connection and read response
 // PyON is converted to JSON using text replacement
 func readPyON(conn net.Conn, command string) (outJSON string, err error) {
@@ -43,30 +45,23 @@ func readPyON(conn net.Conn, command string) (outJSON string, err error) {
 	return
 }
 
-// ReadQueueInfo sends command to FAH client and returns a list of QueueInfo structs
-func ReadQueueInfo(conn net.Conn) (q []QueueInfo, err error) {
-	out, err := readPyON(conn, "queue-info")
+// ReadFAH sends command to FAH client and unmarshals data into struct
+func ReadFAH(conn net.Conn, cmd string, target interface{}) error {
+	out, err := readPyON(conn, cmd)
 	if err != nil {
-		return
+		return err
 	}
-	err = json.Unmarshal([]byte(out), &q)
-	if err != nil {
-		return
-	}
-	return
+	return json.Unmarshal([]byte(out), target)
 }
 
-// ReadSlotInfo sends command to FAH client and returns a list of SlotInfo structs
-func ReadSlotInfo(conn net.Conn) (q []SlotInfo, err error) {
-	out, err := readPyON(conn, "slot-info")
+// ReadAPI sends GET request to FAH API and unmarshals data into struct
+func ReadAPI(endpoint string, target interface{}) error {
+	resp, err := myClient.Get(fmt.Sprintf("%s/%s", fahAPI, endpoint))
 	if err != nil {
-		return
+		return err
 	}
-	err = json.Unmarshal([]byte(out), &q)
-	if err != nil {
-		return
-	}
-	return
+	defer resp.Body.Close()
+	return json.NewDecoder(resp.Body).Decode(target)
 }
 
 // QueueInfo is the data from the queue-info command
@@ -102,15 +97,38 @@ type QueueInfo struct {
 
 // SlotInfo output from slot-info command
 type SlotInfo struct {
-	ID          string  `json:"id"`
-	Status      string  `json:"status"`
-	Description string  `json:"description"`
-	Options     Options `json:"options"`
-	Reason      string  `json:"reason"`
-	Idle        bool    `json:"idle"`
+	ID          string          `json:"id"`
+	Status      string          `json:"status"`
+	Description string          `json:"description"`
+	Options     SlotInfoOptions `json:"options"`
+	Reason      string          `json:"reason"`
+	Idle        bool            `json:"idle"`
 }
 
-// Options from FAH response
-type Options struct {
+// SlotInfoOptions from FAH response
+type SlotInfoOptions struct {
 	Paused bool `json:"paused"`
+}
+
+// Options output from options command
+type Options struct {
+	Power string `json:"power"`
+	Team  string `json:"team"`
+	User  string `json:"user"`
+}
+
+// DonorAPI from https://stats.foldingathome.org/api/donor/<user>
+type DonorAPI struct {
+	Rank   int       `json:"rank"`
+	ID     int       `json:"id"`
+	Name   string    `json:"name"`
+	Teams  []TeamAPI `json:"teams"`
+	Credit int       `json:"credit"`
+}
+
+// TeamAPI from https://stats.foldingathome.org/api/team/<team>
+type TeamAPI struct {
+	Credit int    `json:"credit"`
+	Team   int    `json:"team"`
+	Name   string `json:"name"`
 }

@@ -4,6 +4,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -11,32 +12,40 @@ import (
 
 const namespace = "fah"
 
-var prevMetrics Metrics
+var (
+	prevMetrics Metrics
+	lastUpdate  time.Time
+)
 
 // Exporter is the struct for all metrics
 type Exporter struct {
 	// Generic info
 	up        prometheus.Gauge
 	slotCount prometheus.Gauge
+	options   *prometheus.GaugeVec
 	// Slot info
 	description *prometheus.GaugeVec
 	idle        *prometheus.GaugeVec
 	paused      *prometheus.GaugeVec
-	reason      *prometheus.GaugeVec
 	// Queue info
-	eta         *prometheus.GaugeVec
 	framesDone  *prometheus.GaugeVec
+	totalFrames *prometheus.GaugeVec
 	percentDone *prometheus.GaugeVec
 	ppd         *prometheus.GaugeVec
-	qError      *prometheus.GaugeVec
-	state       *prometheus.GaugeVec
-	totalFrames *prometheus.GaugeVec
+	queueInfo   *prometheus.GaugeVec
+	// Donor API
+	donorCredit     *prometheus.GaugeVec
+	donorID         *prometheus.GaugeVec
+	donorRank       *prometheus.GaugeVec
+	donorTeamCredit *prometheus.GaugeVec
 }
 
 // Metrics collected metrics
 type Metrics struct {
-	Slots  []SlotInfo
-	Queues []QueueInfo
+	Slots   []SlotInfo
+	Queues  []QueueInfo
+	Options Options
+	Donor   DonorAPI
 }
 
 // NewExporter initializes the Exporter struct
@@ -57,6 +66,14 @@ func NewExporter() *Exporter {
 				Help:      "Count of folding slots",
 			},
 		),
+		options: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "options",
+				Help:      "Client options",
+			},
+			[]string{"user", "team", "power"},
+		),
 		// Slot info
 		description: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -65,14 +82,6 @@ func NewExporter() *Exporter {
 				Help:      "Folding slot description",
 			},
 			[]string{"slot", "description"},
-		),
-		reason: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "reason",
-				Help:      "Why the slot is paused",
-			},
-			[]string{"slot", "reason"},
 		),
 		idle: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -88,33 +97,9 @@ func NewExporter() *Exporter {
 				Name:      "paused",
 				Help:      "Whether slot is paused",
 			},
-			[]string{"slot"},
+			[]string{"slot", "reason"},
 		),
 		// Queue info
-		eta: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "eta",
-				Help:      "Task ETA",
-			},
-			[]string{"slot", "queue", "eta"},
-		),
-		qError: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "queue_error",
-				Help:      "Task error",
-			},
-			[]string{"slot", "queue", "error"},
-		),
-		state: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "state",
-				Help:      "Task state",
-			},
-			[]string{"slot", "queue", "state"},
-		),
 		framesDone: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: namespace,
@@ -147,6 +132,47 @@ func NewExporter() *Exporter {
 			},
 			[]string{"slot", "queue"},
 		),
+		queueInfo: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "queue_info",
+				Help:      "Task state, ETA and eventual error",
+			},
+			[]string{"slot", "queue", "state", "eta", "error"},
+		),
+		// Donor API
+		donorCredit: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "donor_credit",
+				Help:      "Donor total credit",
+			},
+			[]string{"user"},
+		),
+		donorID: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "donor_id",
+				Help:      "Donor user ID",
+			},
+			[]string{"user"},
+		),
+		donorRank: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "donor_rank",
+				Help:      "Donor rank",
+			},
+			[]string{"user"},
+		),
+		donorTeamCredit: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "donor_team_credit",
+				Help:      "Donor credit per team",
+			},
+			[]string{"user", "name", "team"},
+		),
 	}
 }
 
@@ -157,18 +183,33 @@ func collectMetrics() (data Metrics, err error) {
 		return
 	}
 	defer conn.Close()
-	qInfo, err := ReadQueueInfo(conn)
+	err = ReadFAH(conn, "queue-info", &data.Queues)
 	if err != nil {
 		log.Errorf("Cannot read queue info: %v", err)
 		return
 	}
-	sInfo, err := ReadSlotInfo(conn)
+	err = ReadFAH(conn, "slot-info", &data.Slots)
 	if err != nil {
 		log.Errorf("Cannot read slot info: %v", err)
 		return
 	}
-	data.Queues = qInfo
-	data.Slots = sInfo
+	err = ReadFAH(conn, "options", &data.Options)
+	if err != nil {
+		log.Errorf("Cannot read options: %v", err)
+		return
+	}
+	if getAPI {
+		if time.Since(lastUpdate).Seconds() > apiThrottle.Seconds() {
+			log.Debugf("Getting donor API data")
+			err = ReadAPI("/donor/"+data.Options.User, &data.Donor)
+			if err != nil {
+				log.Errorf("Cannot get donor info from API: %v", err)
+			}
+			lastUpdate = time.Now()
+		} else {
+			data.Donor = prevMetrics.Donor
+		}
+	}
 	return
 }
 
@@ -188,49 +229,39 @@ func (e *Exporter) Collect(metrics chan<- prometheus.Metric) {
 	// Delete previous data
 	// This is done so that we don't keep showing old data
 	// when a slot is removed for example
+	e.options.DeleteLabelValues(prevMetrics.Options.User, prevMetrics.Options.Team, data.Options.Power)
 	for _, s := range prevMetrics.Slots {
 		e.description.DeleteLabelValues(s.ID, s.Description)
-		e.reason.DeleteLabelValues(s.ID, s.Reason)
 		e.idle.DeleteLabelValues(s.ID)
-		e.paused.DeleteLabelValues(s.ID)
+		e.paused.DeleteLabelValues(s.ID, s.Reason)
 	}
 	for _, q := range prevMetrics.Queues {
-		e.eta.DeleteLabelValues(q.Slot, q.ID, q.Eta)
-		e.qError.DeleteLabelValues(q.Slot, q.ID, q.Error)
-		e.state.DeleteLabelValues(q.Slot, q.ID, q.State)
 		e.framesDone.DeleteLabelValues(q.Slot, q.ID)
 		e.totalFrames.DeleteLabelValues(q.Slot, q.ID)
 		e.percentDone.DeleteLabelValues(q.Slot, q.ID)
 		e.ppd.DeleteLabelValues(q.Slot, q.ID)
+		e.queueInfo.DeleteLabelValues(q.Slot, q.ID, q.State, q.Eta, q.Error)
 	}
 
-	prevMetrics = data
+	e.options.WithLabelValues(data.Options.User, data.Options.Team, data.Options.Power).Set(1)
 
 	// Add collected slot data
 	for _, s := range data.Slots {
 		e.description.WithLabelValues(s.ID, s.Description).Set(1)
-		if len(s.Reason) > 0 {
-			e.reason.WithLabelValues(s.ID, s.Reason).Set(1)
-		} else {
-			e.reason.WithLabelValues(s.ID, s.Reason).Set(0)
-		}
 		if s.Idle {
 			e.idle.WithLabelValues(s.ID).Set(1)
 		} else {
 			e.idle.WithLabelValues(s.ID).Set(0)
 		}
 		if s.Options.Paused {
-			e.paused.WithLabelValues(s.ID).Set(1)
+			e.paused.WithLabelValues(s.ID, s.Reason).Set(1)
 		} else {
-			e.paused.WithLabelValues(s.ID).Set(0)
+			e.paused.WithLabelValues(s.ID, s.Reason).Set(0)
 		}
 	}
 
 	// Add collected queue data
 	for _, q := range data.Queues {
-		e.eta.WithLabelValues(q.Slot, q.ID, q.Eta).Set(1)
-		e.qError.WithLabelValues(q.Slot, q.ID, q.Error).Set(1)
-		e.state.WithLabelValues(q.Slot, q.ID, q.State).Set(1)
 		e.framesDone.WithLabelValues(q.Slot, q.ID).Set(float64(q.FramesDone))
 		e.totalFrames.WithLabelValues(q.Slot, q.ID).Set(float64(q.TotalFrames))
 		percDone, err := strconv.ParseFloat(strings.TrimSuffix(q.PercentDone, "%"), 64)
@@ -245,37 +276,61 @@ func (e *Exporter) Collect(metrics chan<- prometheus.Metric) {
 			return
 		}
 		e.ppd.WithLabelValues(q.Slot, q.ID).Set(ppd)
+		e.queueInfo.WithLabelValues(q.Slot, q.ID, q.State, q.Eta, q.Error).Set(1)
 	}
 
 	e.up.Collect(metrics)
 	e.slotCount.Collect(metrics)
+	e.options.Collect(metrics)
 	e.description.Collect(metrics)
 	e.idle.Collect(metrics)
 	e.paused.Collect(metrics)
-	e.reason.Collect(metrics)
-	e.eta.Collect(metrics)
 	e.framesDone.Collect(metrics)
+	e.totalFrames.Collect(metrics)
 	e.percentDone.Collect(metrics)
 	e.ppd.Collect(metrics)
-	e.qError.Collect(metrics)
-	e.state.Collect(metrics)
-	e.totalFrames.Collect(metrics)
+	e.queueInfo.Collect(metrics)
 
+	if getAPI {
+		e.donorCredit.DeleteLabelValues(data.Donor.Name)
+		e.donorID.DeleteLabelValues(data.Donor.Name)
+		e.donorRank.DeleteLabelValues(data.Donor.Name)
+		for _, t := range prevMetrics.Donor.Teams {
+			e.donorTeamCredit.DeleteLabelValues(prevMetrics.Donor.Name, t.Name, strconv.Itoa(t.Team))
+		}
+		e.donorCredit.WithLabelValues(data.Donor.Name).Set(float64(data.Donor.Credit))
+		e.donorID.WithLabelValues(data.Donor.Name).Set(float64(data.Donor.ID))
+		e.donorRank.WithLabelValues(data.Donor.Name).Set(float64(data.Donor.Rank))
+		for _, t := range data.Donor.Teams {
+			e.donorTeamCredit.WithLabelValues(data.Donor.Name, t.Name, strconv.Itoa(t.Team)).Set(float64(t.Credit))
+		}
+		e.donorCredit.Collect(metrics)
+		e.donorID.Collect(metrics)
+		e.donorRank.Collect(metrics)
+		e.donorTeamCredit.Collect(metrics)
+	}
+
+	prevMetrics = data
 }
 
 // Describe sends the super-set of all possible descriptors
 func (e *Exporter) Describe(descs chan<- *prometheus.Desc) {
 	e.up.Describe(descs)
 	e.slotCount.Describe(descs)
+	e.options.Describe(descs)
 	e.description.Describe(descs)
 	e.idle.Describe(descs)
 	e.paused.Describe(descs)
-	e.reason.Describe(descs)
-	e.eta.Describe(descs)
 	e.framesDone.Describe(descs)
+	e.totalFrames.Describe(descs)
 	e.percentDone.Describe(descs)
 	e.ppd.Describe(descs)
-	e.qError.Describe(descs)
-	e.state.Describe(descs)
-	e.totalFrames.Describe(descs)
+	e.queueInfo.Describe(descs)
+
+	if getAPI {
+		e.donorCredit.Describe(descs)
+		e.donorID.Describe(descs)
+		e.donorRank.Describe(descs)
+		e.donorTeamCredit.Describe(descs)
+	}
 }

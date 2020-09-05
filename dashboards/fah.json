@@ -15,7 +15,7 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "iteration": 1596831384966,
+  "iteration": 1599304678985,
   "links": [],
   "panels": [
     {
@@ -66,7 +66,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "7.1.3",
+      "pluginVersion": "7.1.5",
       "targets": [
         {
           "expr": "fah_slot_count{instance=\"$instance\"}",
@@ -86,6 +86,98 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 6,
+        "w": 10,
+        "x": 3,
+        "y": 0
+      },
+      "hiddenSeries": false,
+      "id": 17,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pluginVersion": "7.1.5",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "fah_donor_credit{instance=\"$instance\"}",
+          "interval": "",
+          "legendFormat": "{{user}} ",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Total Donor Credit",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Prometheus",
       "description": "",
       "fieldConfig": {
         "defaults": {
@@ -97,8 +189,8 @@
       "fillGradient": 0,
       "gridPos": {
         "h": 6,
-        "w": 9,
-        "x": 3,
+        "w": 6,
+        "x": 13,
         "y": 0
       },
       "hiddenSeries": false,
@@ -118,7 +210,7 @@
       "linewidth": 1,
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.3",
+      "pluginVersion": "7.1.5",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -128,7 +220,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "fah_percent_done{instance=\"$instance\"}",
+          "expr": "sum without (queue) (fah_percent_done{instance=\"$instance\"})",
           "interval": "",
           "legendFormat": "Slot {{slot}}",
           "refId": "A"
@@ -154,15 +246,17 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:207",
           "decimals": 1,
           "format": "percent",
           "label": "",
           "logBase": 1,
-          "max": null,
-          "min": null,
+          "max": "100",
+          "min": "0",
           "show": true
         },
         {
+          "$$hashKey": "object:208",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -220,7 +314,19 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 84
+                "value": 40
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ETA"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 188
               }
             ]
           }
@@ -228,19 +334,24 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 6,
-        "x": 12,
+        "w": 5,
+        "x": 19,
         "y": 0
       },
       "id": 14,
       "options": {
         "showHeader": true,
-        "sortBy": []
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "ETA"
+          }
+        ]
       },
-      "pluginVersion": "7.1.3",
+      "pluginVersion": "7.1.5",
       "targets": [
         {
-          "expr": "fah_eta{instance=\"$instance\"}",
+          "expr": "sum (fah_queue_info{instance=\"$instance\"}) by (slot, eta)",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -274,147 +385,6 @@
             },
             "renameByName": {
               "eta": "ETA",
-              "slot": "Slot"
-            }
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": "Prometheus",
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": null
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "slot"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 71
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Frames Done"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 107
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Total Frames"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 111
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Slot"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 68
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 6,
-        "x": 18,
-        "y": 0
-      },
-      "id": 13,
-      "options": {
-        "showHeader": true,
-        "sortBy": []
-      },
-      "pluginVersion": "7.1.3",
-      "targets": [
-        {
-          "expr": "fah_frames_done{instance=\"$instance\"}",
-          "format": "table",
-          "instant": true,
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
-        },
-        {
-          "expr": "fah_total_frames{instance=\"$instance\"}",
-          "format": "table",
-          "instant": true,
-          "interval": "",
-          "legendFormat": "",
-          "refId": "B"
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "Frames",
-      "transformations": [
-        {
-          "id": "filterFieldsByName",
-          "options": {
-            "include": {
-              "names": [
-                "Value #A",
-                "Value #B",
-                "slot"
-              ]
-            }
-          }
-        },
-        {
-          "id": "seriesToColumns",
-          "options": {
-            "byField": "slot"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {},
-            "indexByName": {},
-            "renameByName": {
-              "Value #A": "Frames Done",
-              "Value #B": "Total Frames",
               "slot": "Slot"
             }
           }
@@ -470,7 +440,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "7.1.3",
+      "pluginVersion": "7.1.5",
       "targets": [
         {
           "expr": "fah_idle{instance=\"$instance\"}",
@@ -501,7 +471,7 @@
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
-        "h": 9,
+        "h": 10,
         "w": 24,
         "x": 0,
         "y": 6
@@ -511,10 +481,10 @@
       "legend": {
         "alignAsTable": true,
         "avg": true,
-        "current": false,
+        "current": true,
         "max": true,
         "min": true,
-        "rightSide": true,
+        "rightSide": false,
         "show": true,
         "total": false,
         "values": true
@@ -523,7 +493,7 @@
       "linewidth": 1,
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.3",
+      "pluginVersion": "7.1.5",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -533,7 +503,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "fah_ppd{instance=\"$instance\"}",
+          "expr": "sum without (queue) (fah_ppd{instance=\"$instance\"})",
           "interval": "",
           "legendFormat": "Slot {{slot}}",
           "refId": "A"
@@ -559,7 +529,7 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:59",
+          "$$hashKey": "object:133",
           "decimals": 3,
           "format": "short",
           "label": "",
@@ -569,13 +539,106 @@
           "show": true
         },
         {
-          "$$hashKey": "object:60",
+          "$$hashKey": "object:134",
           "format": "short",
           "label": null,
           "logBase": 1,
           "max": null,
           "min": null,
           "show": false
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Prometheus",
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "hiddenSeries": false,
+      "id": 18,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "percentage": false,
+      "pluginVersion": "7.1.5",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "fah_donor_team_credit{instance=\"$instance\"}",
+          "interval": "",
+          "legendFormat": "{{user}} - {{name}}",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Team Donor Credit",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
         }
       ],
       "yaxis": {
@@ -682,10 +745,10 @@
         ]
       },
       "gridPos": {
-        "h": 9,
+        "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 15
+        "x": 12,
+        "y": 16
       },
       "id": 4,
       "options": {
@@ -697,7 +760,7 @@
           }
         ]
       },
-      "pluginVersion": "7.1.3",
+      "pluginVersion": "7.1.5",
       "targets": [
         {
           "expr": "fah_description{instance=\"$instance\"}",
@@ -724,7 +787,7 @@
           "refId": "C"
         },
         {
-          "expr": "fah_state{instance=\"$instance\"}",
+          "expr": "fah_queue_info{instance=\"$instance\"}",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -878,10 +941,10 @@
         ]
       },
       "gridPos": {
-        "h": 9,
+        "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 15
+        "x": 0,
+        "y": 24
       },
       "id": 15,
       "options": {
@@ -894,10 +957,10 @@
           }
         ]
       },
-      "pluginVersion": "7.1.3",
+      "pluginVersion": "7.1.5",
       "targets": [
         {
-          "expr": "fah_reason{instance=\"$instance\"}",
+          "expr": "fah_paused{instance=\"$instance\"}",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -905,7 +968,7 @@
           "refId": "A"
         },
         {
-          "expr": "fah_queue_error{instance=\"$instance\"}",
+          "expr": "fah_queue_info{instance=\"$instance\"}",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -924,7 +987,6 @@
               "names": [
                 "slot",
                 "Value #A",
-                "reason",
                 "error"
               ]
             }
@@ -956,8 +1018,150 @@
         }
       ],
       "type": "table"
+    },
+    {
+      "datasource": "Prometheus",
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": null
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "slot"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 71
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Frames Done"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 107
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total Frames"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 111
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Slot"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 68
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 24
+      },
+      "id": 13,
+      "options": {
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "7.1.5",
+      "targets": [
+        {
+          "expr": "fah_frames_done{instance=\"$instance\"}",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        },
+        {
+          "expr": "fah_total_frames{instance=\"$instance\"}",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "B"
+        }
+      ],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "Frames",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Value #A",
+                "Value #B",
+                "slot"
+              ]
+            }
+          }
+        },
+        {
+          "id": "seriesToColumns",
+          "options": {
+            "byField": "slot"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "Value #A": "Frames Done",
+              "Value #B": "Total Frames",
+              "slot": "Slot"
+            }
+          }
+        }
+      ],
+      "type": "table"
     }
   ],
+  "refresh": "1m",
   "schemaVersion": 26,
   "style": "dark",
   "tags": [],
@@ -1018,5 +1222,5 @@
   "timezone": "",
   "title": "Folding@home",
   "uid": "W9MKqISGk",
-  "version": 2
+  "version": 5
 }

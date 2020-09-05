@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"net/http"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -14,16 +15,20 @@ const (
 )
 
 var (
-	fahAddress = defaultFahAddress
+	fahAddress  = defaultFahAddress
+	getAPI      = false
+	apiThrottle time.Duration
+	myClient    = &http.Client{Timeout: 10 * time.Second}
 )
 
 func main() {
 	var (
-		level          string
-		listenAddress  string
-		metricsPath    string
-		socketActivate bool
-		noTimestamps   bool
+		level              string
+		listenAddress      string
+		metricsPath        string
+		socketActivate     bool
+		noTimestamps       bool
+		defaultThrottle, _ = time.ParseDuration("1h")
 	)
 
 	flag.StringVar(&level, "log.level", "info", "Set the output log level")
@@ -32,6 +37,8 @@ func main() {
 	flag.StringVar(&metricsPath, "web.telemetry-path", "/metrics", "Path under which to expose metrics.")
 	flag.BoolVar(&socketActivate, "systemd", false, "Run using systemd socket activation")
 	flag.StringVar(&fahAddress, "fah.address", defaultFahAddress, "Listen address of FAH client")
+	flag.BoolVar(&getAPI, "fah.api", false, "Get donor stats from FAH API")
+	flag.DurationVar(&apiThrottle, "fah.api-throttle", defaultThrottle, "How often to refresh API data")
 	flag.Parse()
 	setLogLevel(level)
 

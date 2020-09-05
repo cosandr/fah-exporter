@@ -9,7 +9,7 @@ if [[ ${PIPESTATUS[0]} -ne 4 ]]; then
 fi
 
 OPTIONS=h
-LONGOPTS=help,listen-address:,pkg-name:,bin-path:,systemd-path:,systemd-after:,systemd-requires:
+LONGOPTS=help,listen-address:,pkg-name:,bin-path:,systemd-path:,systemd-after:,systemd-requires:,systemd-args:
 
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
@@ -26,6 +26,7 @@ SYSTEMD_PATH="/etc/systemd/system"
 LISTEN_ADDRESS="0.0.0.0:9659"
 EXTRA_AFTER=""
 EXTRA_REQUIRES=""
+EXTRA_ARGS=""
 
 function print_help () {
 # Using a here doc with standard out.
@@ -45,6 +46,7 @@ Options:
       --systemd-path      Path where systemd units are installed (default $SYSTEMD_PATH)
       --systemd-after     Add to After in systemd service (default network.target)
       --systemd-requires  Add to Requires in systemd service (default network.target)
+      --systemd-args      Add extra arguments to unit file
 END
 }
 
@@ -78,6 +80,10 @@ while true; do
             EXTRA_REQUIRES="$2"
             shift 2
             ;;
+        --systemd-args)
+            EXTRA_ARGS="$2"
+            shift 2
+            ;;
         --)
             shift
             break
@@ -103,6 +109,7 @@ case "$1" in
         go build -o "$PKG_PATH"
         ;;
     systemd)
+        set +e
         echo -e "\n########## Systemd socket ##########\n"
         cat <<EOF | tee "$SOCKET_FILE"
 [Socket]
@@ -120,7 +127,7 @@ After=network.target $EXTRA_AFTER
 Requires=network.target $EXTRA_REQUIRES
 
 [Service]
-ExecStart=$PKG_PATH -systemd
+ExecStart=$PKG_PATH -systemd $EXTRA_ARGS
 EOF
         ;;
     pacman-build)
