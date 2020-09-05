@@ -20,6 +20,7 @@ eval set -- "$PARSED"
 
 ### DEFAULTS ###
 
+PLATFORMS=("windows/amd64" "linux/amd64")
 PKG_NAME="fah-exporter"
 BIN_PATH="/usr/bin"
 SYSTEMD_PATH="/etc/systemd/system"
@@ -34,6 +35,7 @@ cat <<-END
 Usage $0: COMMAND [OPTIONS]
 
 Commands:
+build-all             Build for all platforms (${PLATFORMS[*]})
 install               Build and install binary
 systemd               Create and install systemd socket and service files
 pacman-build          Copy required files to build a pacman package from local files
@@ -105,6 +107,24 @@ SOCKET_FILE="$SYSTEMD_PATH/$PKG_NAME.socket"
 SERVICE_FILE="$SYSTEMD_PATH/$PKG_NAME.service"
 
 case "$1" in
+    build-all)
+        for platform in "${PLATFORMS[@]}"
+        do
+            IFS="/" read -r -a platform_split <<< "$platform"
+            GOOS=${platform_split[0]}
+            GOARCH=${platform_split[1]}
+            output_name=$PKG_NAME'-'$GOOS'-'$GOARCH
+            if [ "$GOOS" = "windows" ]; then
+                output_name+='.exe'
+            fi
+
+            echo "Building $output_name"
+            if ! env GOOS="$GOOS" GOARCH="$GOARCH" go build -o $output_name; then
+                echo 'Build failed'
+                exit 1
+            fi
+        done
+        ;;
     install)
         go build -o "$PKG_PATH"
         ;;
