@@ -4,8 +4,11 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const fahAPI = "https://stats.foldingathome.org/api"
@@ -20,7 +23,7 @@ func readPyON(conn net.Conn, command string) (outJSON string, err error) {
 		return
 	}
 	if expected, actual := len(p), n; expected != actual {
-		err = fmt.Errorf("transmission problem: tried sending %d bytes, but actually only sent %d bytes", expected, actual)
+		err = fmt.Errorf("readPyON: tried sending %d bytes, sent %d bytes", expected, actual)
 		return
 	}
 	var rawOut string
@@ -50,18 +53,34 @@ func ReadFAH(conn net.Conn, cmd string, target interface{}) error {
 	out, err := readPyON(conn, cmd)
 	if err != nil {
 		return err
+	} else if out == "" {
+		return fmt.Errorf("ReadFAH %s: got no output from client", cmd)
 	}
-	return json.Unmarshal([]byte(out), target)
+	err = json.Unmarshal([]byte(out), target)
+	if err != nil {
+		log.Debugf("ReadFAH %s raw output:\n%s", cmd, out)
+		return fmt.Errorf("ReadFAH cannot decode data: %v", err)
+	}
+	return nil
 }
 
 // ReadAPI sends GET request to FAH API and unmarshals data into struct
 func ReadAPI(endpoint string, target interface{}) error {
 	resp, err := myClient.Get(fmt.Sprintf("%s/%s", fahAPI, endpoint))
 	if err != nil {
-		return err
+		return fmt.Errorf("ReadAPI GET %s failed: %v", endpoint, err)
 	}
 	defer resp.Body.Close()
-	return json.NewDecoder(resp.Body).Decode(target)
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("ReadAPI cannot read body: %v", err)
+	}
+	err = json.Unmarshal(body, target)
+	if err != nil {
+		log.Debugf("ReadAPI cannot decode body:\n%s", body)
+		return fmt.Errorf("ReadAPI cannot decode body: %v", err)
+	}
+	return nil
 }
 
 // QueueInfo is the data from the queue-info command

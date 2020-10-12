@@ -179,31 +179,32 @@ func NewExporter() *Exporter {
 func collectMetrics() (data Metrics, err error) {
 	conn, err := net.Dial("tcp", fahAddress)
 	if err != nil {
-		log.Errorf("Cannot connect to FAH client: %v", err)
 		return
 	}
 	defer conn.Close()
 	err = ReadFAH(conn, "queue-info", &data.Queues)
 	if err != nil {
-		log.Errorf("Cannot read queue info: %v", err)
-		return
+		log.Warn(err)
+		err = nil
 	}
 	err = ReadFAH(conn, "slot-info", &data.Slots)
 	if err != nil {
-		log.Errorf("Cannot read slot info: %v", err)
-		return
+		log.Warn(err)
+		err = nil
 	}
 	err = ReadFAH(conn, "options", &data.Options)
 	if err != nil {
-		log.Errorf("Cannot read options: %v", err)
-		return
+		log.Warn(err)
+		err = nil
 	}
 	if getAPI {
 		if time.Since(lastUpdate).Seconds() > apiThrottle.Seconds() {
 			log.Debugf("Getting donor API data")
 			err = ReadAPI("/donor/"+data.Options.User, &data.Donor)
 			if err != nil {
-				log.Errorf("Cannot get donor info from API: %v", err)
+				log.Warnf("Cannot get donor info from API: %v", err)
+				// Expose metrics even if this fails
+				err = nil
 			}
 			lastUpdate = time.Now()
 		} else {
@@ -266,16 +267,16 @@ func (e *Exporter) Collect(metrics chan<- prometheus.Metric) {
 		e.totalFrames.WithLabelValues(q.Slot, q.ID).Set(float64(q.TotalFrames))
 		percDone, err := strconv.ParseFloat(strings.TrimSuffix(q.PercentDone, "%"), 64)
 		if err != nil {
-			log.Debugf("Cannot parse percetange done: %v", err)
-			return
+			log.Warnf("Cannot parse percentage done '%s': %v", q.PercentDone, err)
+		} else {
+			e.percentDone.WithLabelValues(q.Slot, q.ID).Set(percDone)
 		}
-		e.percentDone.WithLabelValues(q.Slot, q.ID).Set(percDone)
-		ppd, _ := strconv.ParseFloat(q.Ppd, 64)
+		ppd, err := strconv.ParseFloat(q.Ppd, 64)
 		if err != nil {
-			log.Debugf("Cannot parse ppd: %v", err)
-			return
+			log.Warnf("Cannot parse ppd '%s': %v", q.Ppd, err)
+		} else {
+			e.ppd.WithLabelValues(q.Slot, q.ID).Set(ppd)
 		}
-		e.ppd.WithLabelValues(q.Slot, q.ID).Set(ppd)
 		e.queueInfo.WithLabelValues(q.Slot, q.ID, q.State, q.Eta, q.Error).Set(1)
 	}
 
