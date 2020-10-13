@@ -34,7 +34,7 @@ func readPyON(conn net.Conn, command string) (outJSON string, err error) {
 		if t == "---" {
 			break
 		}
-		if strings.HasPrefix(t, "PyON") {
+		if strings.Contains(t, "PyON") {
 			reading = true
 			continue
 		}
